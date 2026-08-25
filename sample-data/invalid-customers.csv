@@ -1,0 +1,6 @@
+name,email,phone,company,city
+,missing.name@example.com,+1 415 555 0100,Acme Corp,San Francisco
+Invalid Email,not-an-email,+1 415 555 0101,Acme Corp,San Francisco
+Bad Phone,phone-text,Acme Corp,Acme Corp,Seattle
+No Company,nocompany@example.com,+91 98765 43210,,Delhi
+Multiple Problems,wrong-email,123,,Mumbai

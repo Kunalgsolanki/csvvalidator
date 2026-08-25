@@ -1,0 +1,5 @@
+name,email,phone,company,city
+Ada Lovelace,ada@example.com,+44 20 7946 0958,Analytical Engines,London
+Grace Hopper,grace@example.com,+1 (212) 555-0199,Navy,New York
+,broken-email,12345,,Mumbai
+Duplicate Person,ada@example.com,+91 98765 43210,Example Co,Delhi
