@@ -1,16 +1,11 @@
 import csv
 import io
 import json
-import re
 import uuid
-from collections import Counter
 from datetime import UTC, datetime
-from pathlib import Path
-from .config import ALLOWED_COLUMNS, REQUIRED_COLUMNS
+from .config import ALLOWED_COLUMNS
 from .database import connection, initialise_database
-
-EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9 .()\-]{6,19}$")
+from .validation import parse_csv, validate_rows
 
 
 def now() -> str:
@@ -46,61 +41,12 @@ def list_jobs():
     return [job_dict(row) for row in rows]
 
 
-def normalise(row: dict[str, str | None]) -> dict[str, str]:
-    return {column: (row.get(column) or "").strip() for column in ALLOWED_COLUMNS}
-
-
-def validate_csv(content: bytes) -> list[dict[str, str]]:
-    try:
-        text = content.decode("utf-8-sig")
-    except UnicodeDecodeError as exc:
-        raise ValueError("The CSV must be UTF-8 encoded.") from exc
-    if not text.strip():
-        raise ValueError("The uploaded CSV is empty.")
-    try:
-        reader = csv.DictReader(io.StringIO(text))
-        headers = [header.strip().lower() for header in (reader.fieldnames or [])]
-        missing = sorted(set(REQUIRED_COLUMNS) - set(headers))
-        if missing:
-            raise ValueError(f"Missing required column(s): {', '.join(missing)}.")
-        unexpected = set(headers) - set(ALLOWED_COLUMNS)
-        if unexpected:
-            raise ValueError(f"Unexpected column(s): {', '.join(sorted(unexpected))}.")
-        rows = []
-        for raw in reader:
-            if None in raw:
-                raise ValueError("A row contains more values than the header defines.")
-            rows.append(normalise({key.strip().lower(): value for key, value in raw.items()}))
-        return rows
-    except csv.Error as exc:
-        raise ValueError("The file contains malformed CSV data.") from exc
-
-
 def process_job(job_id: str, content: bytes) -> None:
     with connection() as db:
         db.execute("UPDATE import_jobs SET status = 'processing' WHERE id = ?", (job_id,))
     try:
-        rows = validate_csv(content)
-        email_counts = Counter(row['email'].lower() for row in rows if row['email'])
-        results = []
-        duplicates = 0
-        for index, row in enumerate(rows, start=2):
-            reasons = []
-            if not row['name']:
-                reasons.append('Name is required.')
-            if not row['email'] or not EMAIL_PATTERN.match(row['email']):
-                reasons.append('Email address is invalid.')
-            elif email_counts[row['email'].lower()] > 1:
-                reasons.append('Email is duplicated in this file.')
-                duplicates += 1
-            if not row['phone'] or not PHONE_PATTERN.match(row['phone']):
-                reasons.append('Phone number is invalid.')
-            if not row['company']:
-                reasons.append('Company is required.')
-            # `is_valid` is stored as INTEGER so the same schema works in
-            # SQLite and PostgreSQL. Psycopg does not implicitly cast bool to
-            # integer, therefore pass the database representation explicitly.
-            results.append((job_id, index, row['name'], row['email'], row['phone'], row['company'], row['city'], json.dumps(reasons), int(not reasons)))
+        rows = parse_csv(content)
+        results, duplicates = validate_rows(job_id, rows)
         valid = sum(1 for result in results if result[-1])
         with connection() as db:
             db.executemany("""INSERT INTO import_records

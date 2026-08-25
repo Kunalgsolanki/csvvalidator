@@ -10,6 +10,25 @@ A production-minded React + FastAPI CSV import dashboard created for the OnePris
 - Per-row validation: name/company required, email and phone format, and duplicate email in the uploaded file
 - Search, invalid-only filter, pagination, previous-import selection, and valid-record CSV download
 
+## Project structure
+
+```
+frontend/
+  src/App.jsx                  # page state, API calls, and event handlers
+  src/components/ImportSidebar # file picker and import history
+  src/components/ImportResults # metrics, filters, records table, downloads
+  src/api.js                   # all frontend-to-backend requests
+
+backend/
+  app/main.py                  # FastAPI routes and HTTP responses
+  app/service.py               # import workflow and database queries
+  app/validation.py            # CSV parsing and customer validation rules
+  app/database.py              # SQLite/PostgreSQL connection compatibility
+  app/schemas.py               # API response models
+```
+
+Request flow: **React component → `api.js` → FastAPI route → service → validation/database → JSON response**.
+
 ## Run locally
 
 Terminal 1:
